@@ -1,6 +1,7 @@
 #include "main.h"
 #include "string.h" // for memset()
 
+
 #include "stm32f4xx_hal.h"
 
 
@@ -10,7 +11,7 @@
 #include "MadgwickAHRS.h"
 
 
-#define SAMPLING_FREQ  1000 // Hz
+#define SAMPLING_FREQ  3200 // Hz
 #define I2C_SPEEDCLOCK 400000 // Hz
 #define I2C_DUTYCYCLE  I2C_DUTYCYCLE_2
 
@@ -28,11 +29,14 @@ ITG3200  Gyro;     // 400KHz I2C capable
 HMC5883L Magn;     // 400KHz I2C capable, left at the default 15Hz data Rate
 Madgwick Madgwick;
 
+
 // Each used module must be enabled in stm32f4xx_hal_conf.h
 I2C_HandleTypeDef  hi2c1;
 UART_HandleTypeDef huart2;
 TIM_HandleTypeDef  Tim2Handle; // The Time Base
+
 static float values[9];
+
 
 int
 main(void) {
@@ -61,7 +65,7 @@ main(void) {
     Magn.ReadScaledAxis(&values[6]);
 
     // Let's start with a first estimate of the position (assumed the sensor static!)
-    for(int i=0; i<10000; i++) {
+    for(int i=0; i<10000; i++) { // ~13us per Madgwick.update()
         Madgwick.update(values[3], values[4], values[5],
                         values[0], values[1], values[2],
                         values[6], values[7], values[8]);
@@ -268,8 +272,11 @@ MX_GPIO_Init(void) {
 
 void
 Error_Handler(void) {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(50);
+    HAL_TIM_Base_Stop_IT(&Tim2Handle);
+    while(true) {
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+        HAL_Delay(50);
+    }
 }
 
 
