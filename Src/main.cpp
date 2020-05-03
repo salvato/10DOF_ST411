@@ -23,9 +23,9 @@ static void initSensors();
 static void initTIM2(void);
 
 
-ADXL345  Acc;
+ADXL345  Acc;      // Maximum Output Data Rate when using 400kHz I2C is 800 Hz
 ITG3200  Gyro;     // 400KHz I2C capable
-HMC5883L Magn;
+HMC5883L Magn;     // 400KHz I2C capable, left at the default 15Hz data Rate
 Madgwick Madgwick;
 
 // Each used module must be enabled in stm32f4xx_hal_conf.h
@@ -86,6 +86,7 @@ initSensors() {
             HAL_Delay(50);
         }
     }
+    Acc.setRate(800.0f);
     bResult = Gyro.init(ITG3200_ADDR_AD0_LOW, &hi2c1);
     if(!bResult) {
         while(1) {
