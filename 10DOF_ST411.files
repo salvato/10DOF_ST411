@@ -1,3 +1,4 @@
+.gitignore
 Drivers/CMSIS/Core/Include/cmsis_armcc.h
 Drivers/CMSIS/Core/Include/cmsis_armclang.h
 Drivers/CMSIS/Core/Include/cmsis_compiler.h
