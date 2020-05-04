@@ -7,10 +7,12 @@
 #include <HMC5883L.h>
 #include "MadgwickAHRS.h"
 #include "MotorController.h"
+#include "PID_v1.h"
 
 
 #define SAMPLING_FREQ    3200 // Hz
 #define I2C_SPEEDCLOCK 400000 // Hz
+#define MIN_ABS_SPEED      20
 
 
 static void SystemClock_Config(void);
@@ -28,12 +30,33 @@ UART_HandleTypeDef huart2; // The Serial Interface Handle
 TIM_HandleTypeDef  htim2;  // The Time Base Handle
 TIM_HandleTypeDef  htim3;  // The PWM generator Handle for the Motors
 
+
 ADXL345  Acc;      // Maximum Output Data Rate when using 400kHz I2C is 800 Hz
 ITG3200  Gyro;     // 400KHz I2C capable
 HMC5883L Magn;     // 400KHz I2C capable, left at the default 15Hz data Rate
 Madgwick Madgwick; // ~13us per Madgwick.update() with NUCLEO-F411RE
 
 
+// orientation/motion vars
+Quaternion q;           // [w, x, y, z]         quaternion container
+VectorFloat gravity;    // [x, y, z]            gravity vector
+float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+static float values[9];
+
+
+//PID
+double originalSetpoint = 175.8;
+double setpoint = originalSetpoint;
+double movingAngleOffset = 0.1;
+double input, output;
+int moveState = 0; // 0 = balance; 1 = back; 2 = forth
+double Kp = 50.0;
+double Kd = 1.4;
+double Ki = 60.0;
+PID pid(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+
+
+// MotorController
 double motorSpeedFactorLeft  = 0.6;
 double motorSpeedFactorRight = 0.5;
 MotorController MotorController(Pin{GPIOA, GPIO_PIN_6},// ena
@@ -46,7 +69,6 @@ MotorController MotorController(Pin{GPIOA, GPIO_PIN_6},// ena
                                 motorSpeedFactorRight);
 
 
-static float values[9];
 
 
 int
@@ -93,6 +115,12 @@ main(void) {
     if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2) != HAL_OK) {
         Error_Handler();
     }
+
+    //setup PID
+
+    pid.SetMode(AUTOMATIC);
+    pid.SetSampleTime(10); // in ms
+    pid.SetOutputLimits(-255, 255);
 
     int speed = 0;
     while(1) {
@@ -190,6 +218,13 @@ TIM2_IRQHandler(void) {
     Madgwick.update(values[3], values[4], values[5],
                     values[0], values[1], values[2],
                     values[6], values[7], values[8]);
+    Madgwick.dmpGetQuaternion(&q, fifoBuffer);
+    Madgwick.dmpGetGravity(&gravity, &q);
+    Madgwick.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+    pid.Compute();
+    MotorController.move(output, MIN_ABS_SPEED);
+
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
 }

@@ -66,6 +66,7 @@ Src/ITG3200.cpp \
 Src/HMC5883L.cpp \
 Src/MadgwickAHRS.cpp \
 Src/MotorController.cpp \
+Src/PID_v1.cpp \
 
 
 # ASM sources
