@@ -865,6 +865,7 @@ Inc/ADXL345.h
 Inc/HMC5883L.h
 Inc/ITG3200.h
 Inc/MadgwickAHRS.h
+Inc/MotorController.h
 Inc/main.h
 Inc/stm32f4xx_hal_conf.h
 Inc/stm32f4xx_it.h
@@ -878,6 +879,7 @@ Src/HMC5883L.cpp
 Src/ITG3200.cpp
 Src/MadgwickAHRS.cpp
 Src/MadgwickAHRS.cpp
+Src/MotorController.cpp
 Src/main.cpp
 Src/stm32f4xx_hal_msp.c
 Src/stm32f4xx_it.c

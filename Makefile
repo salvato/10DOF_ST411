@@ -64,7 +64,8 @@ Src/main.cpp \
 Src/ADXL345.cpp \
 Src/ITG3200.cpp \
 Src/HMC5883L.cpp \
-Src/MadgwickAHRS.cpp
+Src/MadgwickAHRS.cpp \
+Src/MotorController.cpp \
 
 
 # ASM sources
@@ -153,7 +154,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 LDSCRIPT = STM32F411RETx_FLASH.ld
 
 # libraries
-LIBS = -lc -lm -lnosys 
+LIBS = -lc -lm -lnosys
 LIBDIR = 
 # Need to add  -specs=nosys.specs !!!
 LDFLAGS = $(MCU)  -specs=nosys.specs -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
