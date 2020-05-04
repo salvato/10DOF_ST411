@@ -37,18 +37,14 @@ HMC5883L Magn;     // 400KHz I2C capable, left at the default 15Hz data Rate
 Madgwick Madgwick; // ~13us per Madgwick.update() with NUCLEO-F411RE
 
 
-// orientation/motion vars
-Quaternion q;           // [w, x, y, z]         quaternion container
-VectorFloat gravity;    // [x, y, z]            gravity vector
-float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 static float values[9];
 
 
 //PID
+double input, output;
 double originalSetpoint = 175.8;
 double setpoint = originalSetpoint;
 double movingAngleOffset = 0.1;
-double input, output;
 int moveState = 0; // 0 = balance; 1 = back; 2 = forth
 double Kp = 50.0;
 double Kd = 1.4;
@@ -218,14 +214,14 @@ TIM2_IRQHandler(void) {
     Madgwick.update(values[3], values[4], values[5],
                     values[0], values[1], values[2],
                     values[6], values[7], values[8]);
-    Madgwick.dmpGetQuaternion(&q, fifoBuffer);
-    Madgwick.dmpGetGravity(&gravity, &q);
-    Madgwick.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
+// yaw:   (about Z axis)
+// pitch: (nose up/down, about Y axis)
+// roll:  (tilt left/right, about X axis)
+    input = Madgwick.getPitch() + 180;
     pid.Compute();
     MotorController.move(output, MIN_ABS_SPEED);
 
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
 }
 

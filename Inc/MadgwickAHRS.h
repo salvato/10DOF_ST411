@@ -68,6 +68,8 @@ public:
         if (!anglesComputed) computeAngles();
         return yaw;
     }
+    void getRotation(float* r0, float* r1, float* r2, float* r3);
+    void getGravity(float *vx, float *vy, float *vz);
 };
 #endif
 

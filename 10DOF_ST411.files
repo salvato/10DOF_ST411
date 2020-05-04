@@ -861,6 +861,7 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_tim.c
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usart.c
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.c
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_utils.c
+Images/Inertial-Frame.png
 Inc/ADXL345.h
 Inc/HMC5883L.h
 Inc/ITG3200.h

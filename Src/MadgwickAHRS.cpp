@@ -253,10 +253,34 @@ Madgwick::invSqrt(float x) {
 //-------------------------------------------------------------------------------------------
 
 void
+Madgwick::getRotation(float* r0, float* r1, float* r2, float* r3) {
+    *r0 = q0;
+    *r1 = q1;
+    *r2 = q2;
+    *r3 = q3;
+}
+
+
+//void
+//Madgwick::dmpGetGravity(VectorFloat *v, Quaternion *q) {
+//    v->x = 2 * (q->x * q->z - q->w * q->y);
+//    v->y = 2 * (q->w * q->x + q->y * q->z);
+//    v->z = q->w * q->w - q->x * q->x - q->y * q->y + q->z*q->z;
+//}
+
+
+void
+Madgwick::getGravity(float *vx, float *vy, float *vz) {
+    *vx = 2 * (q1*q3 - q0*q2);
+    *vy = 2 * (q0*q1 + q2*q3);
+    *vz = q0*q0 - q1*q1 - q2*q2 + q3*q3;
+}
+
+
+void
 Madgwick::computeAngles() {
     roll  = atan2f(q0*q1 + q2*q3, 0.5f - q1*q1 - q2*q2);
     pitch = asinf(-2.0f * (q1*q3 - q0*q2));
     yaw   = atan2f(q1*q2 + q0*q3, 0.5f - q2*q2 - q3*q3);
     anglesComputed = 1;
 }
-

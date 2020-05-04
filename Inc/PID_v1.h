@@ -23,9 +23,9 @@ public:
                                           //   calculation frequency can be set using SetMode
                                           //   SetSampleTime respectively
 
-    void SetOutputLimits(double, double); //clamps the output to a specific range. 0-255 by default, but
-                                          //it's likely the user will want to change this depending on
-                                          //the application
+    void SetOutputLimits(double, double); // * clamps the output to a specific range. 0-255 by default, but
+                                          //   it's likely the user will want to change this depending on
+                                          //   the application
 
     //available but not commonly used functions ********************************************************
     void SetTunings(double, double,       // * While most users will set the tunings once in the
@@ -39,10 +39,10 @@ public:
                                           //   the PID calculation is performed.  default is 100
 
     //Display functions ****************************************************************
-    double GetKp();						  // These functions query the pid for interal values.
-    double GetKi();						  //  they were created mainly for the pid front-end,
-    double GetKd();						  // where it's important to know what is actually
-    int GetMode();						  //  inside the PID.
+    double GetKp();						  // * These functions query the pid for interal values.
+    double GetKi();						  //   they were created mainly for the pid front-end,
+    double GetKd();						  //   where it's important to know what is actually
+    int GetMode();						  //   inside the PID.
     int GetDirection();					  //
 
 private:
@@ -66,7 +66,7 @@ private:
     unsigned long lastTime;
     double ITerm, lastInput;
 
-    int SampleTime;
+    unsigned long SampleTime;
     double outMin, outMax;
     bool inAuto;
 };
