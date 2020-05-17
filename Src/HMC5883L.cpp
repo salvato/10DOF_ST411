@@ -123,6 +123,7 @@ void
 HMC5883L::ReadRawAxis(MagnetometerRaw* raw) {
     uint8_t buffer[6];
     Read(DataRegisterBegin, 6, buffer);
+    // Attention to the Y and Z order. It is the specified one: see datasheet !!!
     raw->XAxis = (buffer[0] << 8) | buffer[1];
     raw->ZAxis = (buffer[2] << 8) | buffer[3];
     raw->YAxis = (buffer[4] << 8) | buffer[5];

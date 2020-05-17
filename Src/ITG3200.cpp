@@ -287,7 +287,9 @@ ITG3200::zeroCalibrate(uint16_t totSamples, uint16_t sampleDelayMS) {
         tmpOffsets[1] += xyz[1];
         tmpOffsets[2] += xyz[2];
     }
-    setOffsets(-tmpOffsets[0]/totSamples, -tmpOffsets[1]/totSamples, -tmpOffsets[2]/totSamples);
+    setOffsets(-int16_t(tmpOffsets[0]/totSamples),
+               -int16_t(tmpOffsets[1]/totSamples),
+               -int16_t(tmpOffsets[2]/totSamples));
 }
 
 

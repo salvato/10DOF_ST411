@@ -22,6 +22,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void TIM2_IRQHandler(void);
 void Error_Handler(void);
 
+extern char sMessage[255];
+
 #ifdef __cplusplus
 }
 #endif

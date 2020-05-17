@@ -1,5 +1,6 @@
 #include "main.h"
 #include "string.h" // for memset()
+#include "stdio.h"
 #include "stm32f4xx_hal.h"
 
 #include <ADXL345.h>
@@ -8,6 +9,18 @@
 #include "MadgwickAHRS.h"
 #include "MotorController.h"
 #include "PID_v1.h"
+
+
+// USART2 GPIO Configuration
+// GND (CN10 20)    ------> GND
+// PA2 (CN10 35)    ------> USART2_TX
+// PA3 (CN10 37)    ------> USART2_RX
+
+// I2C1 GPIO Configuration
+// VIN (CN7  18)    ------> +5V
+// GND (CN7  20)    ------> GND
+// PB6 (CN10 17)    ------> I2C1_SCL
+// PB7 (CN7  21)    ------> I2C1_SDA
 
 
 #define SAMPLING_FREQ    3200 // Hz
@@ -38,6 +51,11 @@ Madgwick Madgwick; // ~13us per Madgwick.update() with NUCLEO-F411RE
 
 
 static float values[9];
+static int UpdateRemote = 0;
+static float q0, q1, q2, q3;
+static HAL_StatusTypeDef result;
+char sMessage[255];
+
 
 
 //PID
@@ -113,16 +131,11 @@ main(void) {
     }
 
     //setup PID
-
     pid.SetMode(AUTOMATIC);
-    pid.SetSampleTime(10); // in ms
+    pid.SetSampleTime(100); // in ms
     pid.SetOutputLimits(-255, 255);
 
-    int speed = 0;
-    while(1) {
-        HAL_Delay(1);
-        MotorController.move(speed++);
-        if(speed > 255) speed = 0;
+    while(true) {
     }
 }
 
@@ -130,6 +143,8 @@ main(void) {
 void
 Sensors_Init() {
     bool bResult;
+
+    // Accelerator Init
     bResult = Acc.init(ADXL345_ADDR_ALT_LOW, &hi2c1);
     if(!bResult) {
         while(1) {
@@ -137,7 +152,10 @@ Sensors_Init() {
             HAL_Delay(50);
         }
     }
-    Acc.setRate(800.0f);
+    Acc.setRangeSetting(2); // +/- 2g. Possible values are: 2g, 4g, 8g, 16g
+//    Acc.setRate(800.0f);
+
+    // Gyroscope Init
     bResult = Gyro.init(ITG3200_ADDR_AD0_LOW, &hi2c1);
     if(!bResult) {
         while(1) {
@@ -146,7 +164,9 @@ Sensors_Init() {
         }
     }
     HAL_Delay(1000);
-    Gyro.zeroCalibrate(128, 5); // calibrate the ITG3200
+    Gyro.zeroCalibrate(600, 10); // calibrate the ITG3200
+
+    // Magnetometer Init
     bResult = Magn.init(HMC5883L_Address, &hi2c1);
     if(!bResult) {
         while(1) {
@@ -165,7 +185,7 @@ Sensors_Init() {
 }
 
 
-// Timer2 provides periodic triggers to start ADC conversion
+// Periodic AHRS Update Interrupt !
 void
 TIM2_Init(void) {
     TIM_ClockConfigTypeDef sClockSourceConfig;
@@ -218,9 +238,21 @@ TIM2_IRQHandler(void) {
 // yaw:   (about Z axis)
 // pitch: (nose up/down, about Y axis)
 // roll:  (tilt left/right, about X axis)
+
     input = Madgwick.getPitch() + 180;
     pid.Compute();
     MotorController.move(output, MIN_ABS_SPEED);
+    UpdateRemote++;
+    UpdateRemote %= 300;
+    if(UpdateRemote == 0) {
+        Madgwick.getRotation(&q0, &q1, &q2, &q3);
+        sprintf(sMessage, "q %d %d %d %d#", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
+        result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
+        if(result != HAL_OK) {
+            sprintf(sMessage, "Error: %d", result);
+            Error_Handler();
+        }
+    }
 
     __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
 }
@@ -431,6 +463,39 @@ Error_Handler(void) {
     HAL_Delay(500);
     HAL_I2C_DeInit(&hi2c1);
     HAL_NVIC_SystemReset();
+}
+
+
+/**
+  * @brief  This function handles DMA RX interrupt request.
+  * @param  None
+  * @retval None
+  */
+void
+USARTx_DMA_RX_IRQHandler(void) {
+  HAL_DMA_IRQHandler(huart2.hdmarx);
+}
+
+
+/**
+  * @brief  This function handles DMA TX interrupt request.
+  * @param  None
+  * @retval None
+  */
+void
+USARTx_DMA_TX_IRQHandler(void) {
+  HAL_DMA_IRQHandler(huart2.hdmatx);
+}
+
+
+/**
+  * @brief  This function handles USARTx interrupt request.
+  * @param  None
+  * @retval None
+  */
+void
+USARTx_IRQHandler(void) {
+  HAL_UART_IRQHandler(&huart2);
 }
 
 
