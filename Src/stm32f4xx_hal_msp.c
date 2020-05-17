@@ -98,6 +98,7 @@ HAL_UART_MspInit(UART_HandleTypeDef* huart) {
 
     /*##-3- Configure the DMA streams ##########################################*/
     /* Configure the DMA handler for Transmission process */
+    __HAL_RCC_DMA1_CLK_ENABLE();
     hdma_tx.Instance                 = DMA1_Stream6;
 
     hdma_tx.Init.Channel             = DMA_CHANNEL_4;

@@ -97,9 +97,9 @@ main(void) {
     Sensors_Init();
 
     // Wait for USER Button press before starting the Communication
-    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 1) ;
+//    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 1) ;
     // Wait for USER Button release before starting the Communication
-    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0) ;
+//    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0) ;
 
     Madgwick.begin(float(SAMPLING_FREQ));
 
@@ -246,7 +246,7 @@ TIM2_IRQHandler(void) {
     UpdateRemote %= 300;
     if(UpdateRemote == 0) {
         Madgwick.getRotation(&q0, &q1, &q2, &q3);
-        sprintf(sMessage, "q %d %d %d %d#", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
+        sprintf(sMessage, "q %d %d %d %d#\r\n", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
         result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
         if(result != HAL_OK) {
             sprintf(sMessage, "Error: %d", result);
@@ -466,35 +466,23 @@ Error_Handler(void) {
 }
 
 
-/**
-  * @brief  This function handles DMA RX interrupt request.
-  * @param  None
-  * @retval None
-  */
+// This function handles DMA RX interrupt request.
 void
-USARTx_DMA_RX_IRQHandler(void) {
+DMA1_Stream5_IRQHandler(void) {
   HAL_DMA_IRQHandler(huart2.hdmarx);
 }
 
 
-/**
-  * @brief  This function handles DMA TX interrupt request.
-  * @param  None
-  * @retval None
-  */
+// This function handles DMA TX interrupt request.
 void
-USARTx_DMA_TX_IRQHandler(void) {
+DMA1_Stream6_IRQHandler(void) {
   HAL_DMA_IRQHandler(huart2.hdmatx);
 }
 
 
-/**
-  * @brief  This function handles USARTx interrupt request.
-  * @param  None
-  * @retval None
-  */
+// This function handles USARTx interrupt request.
 void
-USARTx_IRQHandler(void) {
+USART2_IRQHandler(void) {
   HAL_UART_IRQHandler(&huart2);
 }
 
