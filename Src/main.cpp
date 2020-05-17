@@ -27,6 +27,9 @@
 #define I2C_SPEEDCLOCK 400000 // Hz
 #define MIN_ABS_SPEED      20
 
+#define AREYOUTHERE      0xA1
+#define ACK              0xA2
+
 
 static void SystemClock_Config(void);
 static void GPIO_Init(void);
@@ -35,6 +38,8 @@ static void USART2_UART_Init(void);
 static void TIM3_Init(void);
 static void Sensors_Init();
 static void TIM2_Init(void);
+static void executeCommand();
+
 
 
 // Each module must be enabled in stm32f4xx_hal_conf.h
@@ -55,7 +60,8 @@ static int UpdateRemote = 0;
 static float q0, q1, q2, q3;
 static HAL_StatusTypeDef result;
 char sMessage[255];
-
+char inBuf[256];
+volatile bool bConnected;
 
 
 //PID
@@ -87,11 +93,12 @@ MotorController MotorController(Pin{GPIOA, GPIO_PIN_6},// ena
 
 int
 main(void) {
+    bConnected = false;
     HAL_Init();
     SystemClock_Config();
+    USART2_UART_Init();
     GPIO_Init();
     I2C1_Init();
-    USART2_UART_Init();
     TIM2_Init();
     TIM3_Init();
     Sensors_Init();
@@ -117,6 +124,15 @@ main(void) {
                         values[6], values[7], values[8]);
     }
 
+    result = HAL_UART_Receive_DMA(&huart2, (uint8_t*)inBuf, sizeof(inBuf));
+    if(result != HAL_OK) {
+        sprintf(sMessage, "HAL_UART_Receive_DMA Error: %d", result);
+        Print_Error(sMessage, strlen(sMessage));
+    }
+
+    while(!bConnected) {
+    }
+
     // Start periodic update interrupt !
     if(HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
         Error_Handler();
@@ -134,8 +150,23 @@ main(void) {
     pid.SetMode(AUTOMATIC);
     pid.SetSampleTime(100); // in ms
     pid.SetOutputLimits(-255, 255);
-
     while(true) {
+    }
+}
+
+
+void
+executeCommand() {
+    if(inBuf[0] == AREYOUTHERE) {
+        sMessage[0] = ACK;
+        sMessage[1] = '#';
+        sMessage[2] = 0;
+        result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
+        if(result != HAL_OK) {
+            sprintf(sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
+            Print_Error(sMessage, strlen(sMessage));
+        }
+        bConnected = true;
     }
 }
 
@@ -249,8 +280,8 @@ TIM2_IRQHandler(void) {
         sprintf(sMessage, "q %d %d %d %d#\r\n", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
         result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
         if(result != HAL_OK) {
-            sprintf(sMessage, "Error: %d", result);
-            Error_Handler();
+            sprintf(sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
+            Print_Error(sMessage, strlen(sMessage));
         }
     }
 
@@ -374,14 +405,13 @@ GPIO_Init(void) {
 
 
 static void
-TIM3_Init(void) { // TIM£ is a General Purpose Counter
+TIM3_Init(void) { // TIM3 is a General Purpose Counter
     TIM_ClockConfigTypeDef  sClockSourceConfig;
     TIM_MasterConfigTypeDef sMasterConfig;
     TIM_OC_InitTypeDef      sConfigOC;
     memset(&sClockSourceConfig, 0, sizeof(sClockSourceConfig));
     memset(&sMasterConfig,      0, sizeof(sMasterConfig));
     memset(&sConfigOC,          0, sizeof(sConfigOC));
-
 
 /* --------------------------------------------------------------------------------------------
     TIM3 Configuration to generate 2 PWM signals.
@@ -466,6 +496,21 @@ Error_Handler(void) {
 }
 
 
+void
+Print_Error(char* sErrorMessage, int msgLen) {
+    HAL_TIM_Base_Stop_IT(&htim2);
+    HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sErrorMessage, msgLen);
+    for(int i=0; i<20; i++) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+        HAL_Delay(50);
+    }
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_Delay(500);
+    HAL_I2C_DeInit(&hi2c1);
+    HAL_NVIC_SystemReset();
+}
+
+
 // This function handles DMA RX interrupt request.
 void
 DMA1_Stream5_IRQHandler(void) {
@@ -485,6 +530,35 @@ void
 USART2_IRQHandler(void) {
   HAL_UART_IRQHandler(&huart2);
 }
+
+
+
+// Tx Transfer completed callback
+void
+HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle) {
+    UNUSED(UartHandle);
+}
+
+
+// Rx Transfer completed callback
+void
+HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
+    UNUSED(UartHandle);
+    executeCommand();
+    result = HAL_UART_Receive_DMA(&huart2, (uint8_t*)inBuf, sizeof(inBuf));
+    if(result != HAL_OK) {
+        sprintf(sMessage, "HAL_UART_Receive_DMA Error: %d", result);
+        Print_Error(sMessage, strlen(sMessage));
+    }
+}
+
+
+//  UART error callbacks
+void
+HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {
+    UNUSED(UartHandle);
+}
+
 
 
 #ifdef  USE_FULL_ASSERT

@@ -29,6 +29,7 @@ void DMA1_Stream6_IRQHandler(void);
 void USART2_IRQHandler(void);
 
 void Error_Handler(void);
+void Print_Error(char* sErrorMessage, int msgLen);
 
 
 extern char sMessage[255];

@@ -68,7 +68,9 @@ HMC5883L::isDataReady() {
 }
 
 
-int16_t HMC5883L::SetScale(int16_t milliGauss) {
+// the earth’s magnetic magnetic field ranges from 25 to 65 microTeslas
+int16_t
+HMC5883L::SetScale(int16_t milliGauss) {
     uint8_t regValue = 0x00;
     if(milliGauss == 880) {
         regValue = 0x00;
