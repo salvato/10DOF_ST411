@@ -32,7 +32,7 @@ void Error_Handler(void);
 void Print_Error(char* sErrorMessage, int msgLen);
 
 
-extern char sMessage[255];
+extern uint8_t sMessage[255];
 
 #ifdef __cplusplus
 }

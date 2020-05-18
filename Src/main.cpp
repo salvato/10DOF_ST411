@@ -42,7 +42,7 @@ static void executeCommand();
 
 
 
-// Each module must be enabled in stm32f4xx_hal_conf.h
+// Each used module MUST be enabled in stm32f4xx_hal_conf.h
 I2C_HandleTypeDef  hi2c1;  // The Sensors Interface Handle
 UART_HandleTypeDef huart2; // The Serial Interface Handle
 TIM_HandleTypeDef  htim2;  // The Time Base Handle
@@ -59,8 +59,8 @@ static float values[9];
 static int UpdateRemote = 0;
 static float q0, q1, q2, q3;
 static HAL_StatusTypeDef result;
-char sMessage[255];
-char inBuf[256];
+uint8_t sMessage[255];
+uint8_t inBuf[256];
 volatile bool bConnected;
 
 
@@ -89,6 +89,7 @@ MotorController MotorController(Pin{GPIOA, GPIO_PIN_6},// ena
                                 motorSpeedFactorRight);
 
 
+//==========================================================================
 
 
 int
@@ -103,10 +104,15 @@ main(void) {
     TIM3_Init();
     Sensors_Init();
 
+    //setup PID
+    pid.SetMode(AUTOMATIC);
+    pid.SetSampleTime(100); // in ms
+    pid.SetOutputLimits(-255, 255);
+
     // Wait for USER Button press before starting the Communication
-//    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 1) ;
+    // while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 1) ;
     // Wait for USER Button release before starting the Communication
-//    while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0) ;
+    // while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0) ;
 
     Madgwick.begin(float(SAMPLING_FREQ));
 
@@ -117,26 +123,23 @@ main(void) {
     while(!Magn.isDataReady()) {}
     Magn.ReadScaledAxis(&values[6]);
 
-    // Let's start with a first estimate of the position (assumed the sensor static!)
+    // First estimate of the position (assumed a static sensor !)
     for(int i=0; i<10000; i++) { // ~13us per Madgwick.update() with NUCLEO-F411RE
-        Madgwick.update(values[3], values[4], values[5],
-                        values[0], values[1], values[2],
-                        values[6], values[7], values[8]);
+        Madgwick.update(values[3], values[4], values[5], // Gyro
+                        values[0], values[1], values[2], // Acc
+                        values[6], values[7], values[8]);// Mag
     }
 
-    result = HAL_UART_Receive_DMA(&huart2, (uint8_t*)inBuf, sizeof(inBuf));
-    if(result != HAL_OK) {
-        sprintf(sMessage, "HAL_UART_Receive_DMA Error: %d", result);
-        Print_Error(sMessage, strlen(sMessage));
-    }
+    // Wait until connected
+    do {
+        result = HAL_UART_Receive(&huart2, (uint8_t*)inBuf, 1, 100);
+        if((result == HAL_OK) && (inBuf[0] == AREYOUTHERE)) {
+            sMessage[0] = ACK;
+            HAL_UART_Transmit(&huart2, sMessage, 1, 100);
+            bConnected = true;
+        }
+    } while(!bConnected);
 
-    while(!bConnected) {
-    }
-
-    // Start periodic update interrupt !
-    if(HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
-        Error_Handler();
-    }
     // Start PWM signal on channel 1
     if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) != HAL_OK) {
         Error_Handler();
@@ -146,10 +149,11 @@ main(void) {
         Error_Handler();
     }
 
-    //setup PID
-    pid.SetMode(AUTOMATIC);
-    pid.SetSampleTime(100); // in ms
-    pid.SetOutputLimits(-255, 255);
+    // Start periodic update interrupt !
+    if(HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
+        Error_Handler();
+    }
+
     while(true) {
     }
 }
@@ -157,17 +161,17 @@ main(void) {
 
 void
 executeCommand() {
-    if(inBuf[0] == AREYOUTHERE) {
-        sMessage[0] = ACK;
-        sMessage[1] = '#';
-        sMessage[2] = 0;
-        result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
-        if(result != HAL_OK) {
-            sprintf(sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
-            Print_Error(sMessage, strlen(sMessage));
-        }
-        bConnected = true;
-    }
+//    if(inBuf[0] == AREYOUTHERE) {
+//        sMessage[0] = ACK;
+//        sMessage[1] = '#';
+//        sMessage[2] = 0;
+//        result = HAL_UART_Transmit_DMA(&huart2, sMessage, strlen((char*)sMessage));
+//        if(result != HAL_OK) {
+//            sprintf((char *)sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
+//            Print_Error((char *)sMessage, strlen((char *)sMessage));
+//        }
+//        bConnected = true;
+//    }
 }
 
 
@@ -277,11 +281,11 @@ TIM2_IRQHandler(void) {
     UpdateRemote %= 300;
     if(UpdateRemote == 0) {
         Madgwick.getRotation(&q0, &q1, &q2, &q3);
-        sprintf(sMessage, "q %d %d %d %d#\r\n", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
-        result = HAL_UART_Transmit_DMA(&huart2, (uint8_t*)sMessage, strlen(sMessage));
+        sprintf((char *)sMessage, "q %d %d %d %d#\r\n", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
+        result = HAL_UART_Transmit_DMA(&huart2, sMessage, strlen((char *)sMessage));
         if(result != HAL_OK) {
-            sprintf(sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
-            Print_Error(sMessage, strlen(sMessage));
+            sprintf((char *)sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
+            Print_Error((char *)sMessage, strlen((char *)sMessage));
         }
     }
 
@@ -547,8 +551,8 @@ HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
     executeCommand();
     result = HAL_UART_Receive_DMA(&huart2, (uint8_t*)inBuf, sizeof(inBuf));
     if(result != HAL_OK) {
-        sprintf(sMessage, "HAL_UART_Receive_DMA Error: %d", result);
-        Print_Error(sMessage, strlen(sMessage));
+        sprintf((char *)sMessage, "HAL_UART_Receive_DMA Error: %d", result);
+        Print_Error((char *)sMessage, strlen((char *)sMessage));
     }
 }
 
