@@ -11,19 +11,23 @@
 #include "PID_v1.h"
 
 
+//============================
 // USART2 GPIO Configuration
+//============================
 // GND (CN10 20)    ------> GND
 // PA2 (CN10 35)    ------> USART2_TX
 // PA3 (CN10 37)    ------> USART2_RX
 
+
+//============================
 // I2C1 GPIO Configuration
+//============================
 // VIN (CN7  18)    ------> +5V
 // GND (CN7  20)    ------> GND
 // PB6 (CN10 17)    ------> I2C1_SCL
 // PB7 (CN7  21)    ------> I2C1_SDA
 
 
-#define SAMPLING_FREQ    3200 // Hz
 #define I2C_SPEEDCLOCK 400000 // Hz
 #define MIN_ABS_SPEED      20
 
@@ -39,21 +43,31 @@ static void TIM3_Init(void);
 static void Sensors_Init();
 static void TIM2_Init(void);
 static void executeCommand();
+static bool stationary();
 
 
+bool
+stationary() {
+    return false;
+}
 
-// Each used module MUST be enabled in stm32f4xx_hal_conf.h
+
+//=====================================================================
+// Remember: Each used module MUST be enabled in stm32f4xx_hal_conf.h
+//=====================================================================
 I2C_HandleTypeDef  hi2c1;  // The Sensors Interface Handle
 UART_HandleTypeDef huart2; // The Serial Interface Handle
 TIM_HandleTypeDef  htim2;  // The Time Base Handle
 TIM_HandleTypeDef  htim3;  // The PWM generator Handle for the Motors
 
 
-ADXL345  Acc;      // Maximum Output Data Rate when using 400kHz I2C is 800 Hz
-ITG3200  Gyro;     // 400KHz I2C capable
-HMC5883L Magn;     // 400KHz I2C capable, left at the default 15Hz data Rate
+ADXL345  Acc;      // 400KHz I2C Capable. Maximum Output Data Rate is 800 Hz
+ITG3200  Gyro;     // 400KHz I2C Capable
+HMC5883L Magn;     // 400KHz I2C Capable, left at the default 15Hz data Rate
 Madgwick Madgwick; // ~13us per Madgwick.update() with NUCLEO-F411RE
 
+
+uint32_t samplingFrequency = 3200; // Hz
 
 static float values[9];
 static int UpdateRemote = 0;
@@ -61,22 +75,29 @@ static float q0, q1, q2, q3;
 static HAL_StatusTypeDef result;
 uint8_t sMessage[255];
 uint8_t inBuf[256];
+uint8_t sCommand[256];
+uint8_t inChar;
+int32_t nCharRead;
 volatile bool bConnected;
 
 
-//PID
+//================
+// PID Regulator
+//================
 double input, output;
+double Kp = 50.0;
+double Kd = 1.4;
+double Ki = 60.0;
 double originalSetpoint = 175.8;
 double setpoint = originalSetpoint;
 double movingAngleOffset = 0.1;
 int moveState = 0; // 0 = balance; 1 = back; 2 = forth
-double Kp = 50.0;
-double Kd = 1.4;
-double Ki = 60.0;
 PID pid(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
 
 
-// MotorController
+//===================
+// Motor Controller
+//===================
 double motorSpeedFactorLeft  = 0.6;
 double motorSpeedFactorRight = 0.5;
 MotorController MotorController(Pin{GPIOA, GPIO_PIN_6},// ena
@@ -97,11 +118,11 @@ main(void) {
     bConnected = false;
     HAL_Init();
     SystemClock_Config();
-    USART2_UART_Init();
+    USART2_UART_Init(); // The Virtual Comunication Port (VCP)
     GPIO_Init();
-    I2C1_Init();
-    TIM2_Init();
-    TIM3_Init();
+    I2C1_Init();        // I2C Interface to AHRS Sensors
+    TIM2_Init();        // AHRS update interrupt generator
+    TIM3_Init();        // Motor PWM Generator
     Sensors_Init();
 
     //setup PID
@@ -114,7 +135,7 @@ main(void) {
     // Wait for USER Button release before starting the Communication
     // while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0) ;
 
-    Madgwick.begin(float(SAMPLING_FREQ));
+    Madgwick.begin(float(samplingFrequency));
 
     while(!Acc.getInterruptSource(7)) {}
     Acc.get_Gxyz(&values[0]);
@@ -132,8 +153,8 @@ main(void) {
 
     // Wait until connected
     do {
-        result = HAL_UART_Receive(&huart2, (uint8_t*)inBuf, 1, 100);
-        if((result == HAL_OK) && (inBuf[0] == AREYOUTHERE)) {
+        result = HAL_UART_Receive(&huart2, &inChar, 1, 100);
+        if((result == HAL_OK) && (inChar == AREYOUTHERE)) {
             sMessage[0] = ACK;
             HAL_UART_Transmit(&huart2, sMessage, 1, 100);
             bConnected = true;
@@ -141,11 +162,11 @@ main(void) {
     } while(!bConnected);
 
     // Start PWM signal on channel 1
-    if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) != HAL_OK) {
+    if(HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) != HAL_OK) {
         Error_Handler();
     }
     // Start PWM signal on channel 2
-    if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2) != HAL_OK) {
+    if(HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2) != HAL_OK) {
         Error_Handler();
     }
 
@@ -153,6 +174,8 @@ main(void) {
     if(HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
         Error_Handler();
     }
+    nCharRead = 0;
+    result = HAL_UART_Receive_DMA(&huart2, &inChar, 1);
 
     while(true) {
     }
@@ -183,31 +206,29 @@ Sensors_Init() {
     bResult = Acc.init(ADXL345_ADDR_ALT_LOW, &hi2c1);
     if(!bResult) {
         while(1) {
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-            HAL_Delay(50);
+            Error_Handler();
         }
     }
     Acc.setRangeSetting(2); // +/- 2g. Possible values are: 2g, 4g, 8g, 16g
-//    Acc.setRate(800.0f);
 
     // Gyroscope Init
     bResult = Gyro.init(ITG3200_ADDR_AD0_LOW, &hi2c1);
     if(!bResult) {
-        while(1) {
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-            HAL_Delay(50);
-        }
+        Error_Handler();
     }
-    HAL_Delay(1000);
-    Gyro.zeroCalibrate(600, 10); // calibrate the ITG3200
-
+    if(stationary()) {
+        HAL_Delay(1000);
+        Gyro.zeroCalibrate(600, 10); // calibrate the ITG3200
+    }
+    else { // Use Precalculated Values
+        Gyro.offsets[0] = -20.0;
+        Gyro.offsets[1] = -110.0;
+        Gyro.offsets[2] = -35.0;
+    }
     // Magnetometer Init
     bResult = Magn.init(HMC5883L_Address, &hi2c1);
     if(!bResult) {
-        while(1) {
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-            HAL_Delay(50);
-        }
+        Error_Handler();
     }
     int16_t error = Magn.SetScale(1300); // Set the scale (in milli Gauss) of the compass.
     if(error != 0) {
@@ -220,20 +241,24 @@ Sensors_Init() {
 }
 
 
-// Periodic AHRS Update Interrupt !
+//==================================================
+// Periodic AHRS Update Interrupt Initialization !
+//==================================================
 void
 TIM2_Init(void) {
     TIM_ClockConfigTypeDef sClockSourceConfig;
     // Clock enable
     __HAL_RCC_TIM2_CLK_ENABLE();
-    // Time base configuration (100 MHz max CPU frequency)
-    // Prescaler value to have a 40 KHz TIM2 counter clock
-    const uint32_t counterClock = SystemCoreClock/10;
+
+    // Time base configuration (based on 100 MHz CPU frequency)
+    const uint32_t counterClock = SystemCoreClock/100;// 1MHz;
+
+    // Prescaler value to have a 1MHz TIM2 Input Counter Clock
     uint32_t uwPrescalerValue = (uint32_t) ((SystemCoreClock/2)/counterClock)-1;
 
     memset(&htim2, 0, sizeof(htim2));
     htim2.Instance = TIM2;
-    htim2.Init.Period            = (counterClock/SAMPLING_FREQ)-1;
+    htim2.Init.Period            = (counterClock/samplingFrequency)-1; // (Sampling period) / (Clock Period)
     htim2.Init.Prescaler         = uwPrescalerValue;
     htim2.Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1; // tDTS=tCK_INT
     htim2.Init.CounterMode       = TIM_COUNTERMODE_UP;
@@ -242,6 +267,7 @@ TIM2_Init(void) {
     if(HAL_TIM_Base_Init(&htim2) != HAL_OK) {
         Error_Handler();
     }
+    samplingFrequency = (htim2.Init.Period+1) / counterClock; // The Real Obtained Vaalue
 
     memset(&sClockSourceConfig, 0, sizeof(sClockSourceConfig));
     sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
@@ -274,14 +300,15 @@ TIM2_IRQHandler(void) {
 // pitch: (nose up/down, about Y axis)
 // roll:  (tilt left/right, about X axis)
 
-    input = Madgwick.getPitch() + 180;
-    pid.Compute();
-    MotorController.move(output, MIN_ABS_SPEED);
+//    input = Madgwick.getPitch() + 180;
+//    pid.Compute();
+//    MotorController.move(output, MIN_ABS_SPEED);
+
     UpdateRemote++;
-    UpdateRemote %= 300;
+    UpdateRemote %= 320;
     if(UpdateRemote == 0) {
         Madgwick.getRotation(&q0, &q1, &q2, &q3);
-        sprintf((char *)sMessage, "q %d %d %d %d#\r\n", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
+        sprintf((char *)sMessage, "q %d %d %d %d#", int(q0*1000), int(q1*1000) ,int(q2*1000), int(q3*1000));
         result = HAL_UART_Transmit_DMA(&huart2, sMessage, strlen((char *)sMessage));
         if(result != HAL_OK) {
             sprintf((char *)sMessage, "HAL_UART_Transmit_DMA Error: %d", result);
@@ -548,8 +575,21 @@ HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle) {
 void
 HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
     UNUSED(UartHandle);
-    executeCommand();
-    result = HAL_UART_Receive_DMA(&huart2, (uint8_t*)inBuf, sizeof(inBuf));
+    if(inChar == '#') {
+        if(nCharRead < 254) {
+            inBuf[nCharRead++] = inChar;
+            inBuf[nCharRead] = 0;
+            strncpy((char *)sCommand, (char *)inBuf, strlen((char *)inBuf));
+            executeCommand();
+            nCharRead = 0;
+        }
+        else {
+            sprintf((char *)sMessage, "Message too long: discarded");
+            Print_Error((char *)sMessage, strlen((char *)sMessage));
+            nCharRead = 0;
+        }
+    }
+    result = HAL_UART_Receive_DMA(&huart2, &inChar, 1);
     if(result != HAL_OK) {
         sprintf((char *)sMessage, "HAL_UART_Receive_DMA Error: %d", result);
         Print_Error((char *)sMessage, strlen((char *)sMessage));

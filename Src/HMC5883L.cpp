@@ -181,6 +181,8 @@ HMC5883L::Read(uint8_t address, int16_t length, uint8_t* buffer) {
                                     (uint8_t *)buffer,
                                     length,
                                     10);
+    if(result != HAL_OK)
+        Error_Handler();
 }
 
 

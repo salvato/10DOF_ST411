@@ -34,7 +34,7 @@ ITG3200::ITG3200() {
     dev_address = ITG3200_ADDR_AD0_LOW << 1;
     setGains(1.0, 1.0, 1.0);
     setOffsets(0.0, 0.0, 0.0);
-    setRevPolarity(0, 0, 0);
+    setRevPolarity(false, false, false);
 }
 
 
@@ -68,10 +68,15 @@ ITG3200::init(uint16_t  _address, I2C_HandleTypeDef *_pHi2c) {
 void
 ITG3200::init(byte _SRateDiv, byte _Range, byte _filterBW, byte _ClockSrc, bool _ITGReady, bool _INTRawDataReady) {
     setSampleRateDiv(_SRateDiv);
+    HAL_Delay(GYROSTART_UP_DELAY);  // startup
     setFSRange(_Range);
+    HAL_Delay(GYROSTART_UP_DELAY);  // startup
     setFilterBW(_filterBW);
+    HAL_Delay(GYROSTART_UP_DELAY);  // startup
     setClockSource(_ClockSrc);
+    HAL_Delay(GYROSTART_UP_DELAY);  // startup
     setITGReady(_ITGReady);
+    HAL_Delay(GYROSTART_UP_DELAY);  // startup
     setRawDataReady(_INTRawDataReady);
     HAL_Delay(GYROSTART_UP_DELAY);  // startup
 }
