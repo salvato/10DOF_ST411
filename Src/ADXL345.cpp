@@ -32,10 +32,11 @@ using namespace std;
 
 
 ADXL345::ADXL345() {
-    status = ADXL345_OK;
-    error_code = ADXL345_NO_ERROR;
-    pHi2c = nullptr;
+    status      = ADXL345_OK;
+    error_code  = ADXL345_NO_ERROR;
+    pHi2c       = nullptr;
     dev_address = ADXL345_ADDR_ALT_LOW << 1;
+
     gains[0] = 0.0039; // 3.9mg/LSB (see datasheet)
     gains[1] = 0.0039;
     gains[2] = 0.0039;
@@ -46,6 +47,7 @@ bool
 ADXL345::init(int16_t _address, I2C_HandleTypeDef *_pHi2c) {
     pHi2c       = _pHi2c;
     dev_address = _address << 1;
+
     powerOn();
     byte buf;
     readFrom(ADXL345_DEVID, 1, &buf);
@@ -62,6 +64,7 @@ ADXL345::powerOn() {
     //writeTo(ADXL345_POWER_CTL, 0);
     //writeTo(ADXL345_POWER_CTL, 16); // AUTOSLEEP
     writeTo(ADXL345_POWER_CTL, 8); // Set the Measure Bit
+    HAL_Delay(20);
 }
 
 
@@ -80,9 +83,9 @@ ADXL345::readAccel(int16_t *x, int16_t *y, int16_t *z) {
     // each axis reading comes in 10 bit resolution, ie 2 bytes.
     // Least Significat Byte first!!
     // thus we are converting both bytes in to one int
-    *x = (((int16_t)buff[1]) << 8) | buff[0];
-    *y = (((int16_t)buff[3]) << 8) | buff[2];
-    *z = (((int16_t)buff[5]) << 8) | buff[4];
+    *x = int16_t((uint16_t(buff[1])) << 8) | buff[0];
+    *y = int16_t((uint16_t(buff[3])) << 8) | buff[2];
+    *z = int16_t((uint16_t(buff[5])) << 8) | buff[4];
 }
 
 
@@ -92,7 +95,7 @@ ADXL345::get_Gxyz(float *xyz){
     int16_t xyz_int[3];
     readAccel(xyz_int);
     for(i=0; i<3; i++){
-        xyz[i] = xyz_int[i] * gains[i];
+        xyz[i] = float(xyz_int[i]) * gains[i];
     }
 }
 
@@ -766,7 +769,7 @@ ADXL345::setInterruptMapping(byte interruptBit, bool interruptPin) {
 
 bool
 ADXL345::isInterruptEnabled(byte interruptBit) {
-    return getRegisterBit(ADXL345_INT_ENABLE,interruptBit);
+    return getRegisterBit(ADXL345_INT_ENABLE, interruptBit);
 }
 
 
@@ -780,7 +783,7 @@ void
 ADXL345::setRegisterBit(byte regAdress, int16_t bitPos, bool state) {
     byte _b;
     readFrom(regAdress, 1, &_b);
-    if (state) {
+    if(state) {
         _b |= (1 << bitPos);  // forces nth bit of _b to be 1.  all other bits left alone.
     }
     else {

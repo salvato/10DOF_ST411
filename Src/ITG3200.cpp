@@ -42,43 +42,52 @@ bool
 ITG3200::init(uint16_t  _address, I2C_HandleTypeDef *_pHi2c) {
     pHi2c       = _pHi2c;
     dev_address = _address << 1;
-    // Reset to Power_On conditions
-    reset();
-    readmem(WHO_AM_I, 3, &buff[0]);
+
+    reset(); // Reset to Power_On conditions
+
+    readmem(WHO_AM_I, 3, &buff[0]); // Presence Check
     if(buff[0] != ITG3200_ADDR_AD0_LOW)
         Error_Handler();
 
     // Uncomment or change your default ITG3200 initialization
 
     // fast sample rate - divisor = 0 filter = 0 clocksrc = 0, 1, 2, or 3  (raw values)
-    init(NOSRDIVIDER, RANGE2000, BW256_SR8, PLL_XGYRO_REF, true, true);
+    init(NOSRDIVIDER, RANGE2000, BW256_SR8, PLL_XGYRO_REF, 1, 1);
 
     // slow sample rate - divisor = 0  filter = 1,2,3,4,5, or 6  clocksrc = 0, 1, 2, or 3  (raw values)
-    //init(address, NOSRDIVIDER, RANGE2000, BW010_SR1, INTERNALOSC, true, true);
+    //init(NOSRDIVIDER, RANGE2000, BW010_SR1, INTERNALOSC, 1, 1);
 
     // fast sample rate 32Khz external clock - divisor = 0  filter = 0  clocksrc = 4  (raw values)
-    //init(address, NOSRDIVIDER, RANGE2000, BW256_SR8, PLL_EXTERNAL32, true, true);
+    //init(NOSRDIVIDER, RANGE2000, BW256_SR8, PLL_EXTERNAL32, 1, 1);
 
     // slow sample rate 32Khz external clock - divisor = 0  filter = 1,2,3,4,5, or 6  clocksrc = 4  (raw values)
-    //init(address, NOSRDIVIDER, RANGE2000, BW010_SR1, PLL_EXTERNAL32, true, true);
+    //init(NOSRDIVIDER, RANGE2000, BW010_SR1, PLL_EXTERNAL32, 1, 1);
     return true;
 }
 
 
 void
-ITG3200::init(byte _SRateDiv, byte _Range, byte _filterBW, byte _ClockSrc, bool _ITGReady, bool _INTRawDataReady) {
-    setSampleRateDiv(_SRateDiv);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
-    setFSRange(_Range);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
-    setFilterBW(_filterBW);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
+ITG3200::init(byte _SRateDiv, byte _Range, byte _filterBW, byte _ClockSrc, uint8_t _ITGReady, uint8_t _INTRawDataReady) {
+    HAL_Delay(GYROSTART_UP_DELAY);
     setClockSource(_ClockSrc);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
-    setITGReady(_ITGReady);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
+    HAL_Delay(GYROSTART_UP_DELAY);
+
+    setSampleRateDiv(_SRateDiv);
+    HAL_Delay(GYROSTART_UP_DELAY);
+    setFSRange(_Range);
+    HAL_Delay(GYROSTART_UP_DELAY);
+    setFilterBW(_filterBW);
+    HAL_Delay(GYROSTART_UP_DELAY);
     setRawDataReady(_INTRawDataReady);
-    HAL_Delay(GYROSTART_UP_DELAY);  // startup
+    HAL_Delay(GYROSTART_UP_DELAY);
+    setLatchMode(UNTIL_INT_CLEARED);  // Interrupt stay ON until cleared
+    HAL_Delay(GYROSTART_UP_DELAY);
+    setLatchClearMode(READ_STATUSREG);// Interrupt Cleared by Reading Status Register
+    HAL_Delay(GYROSTART_UP_DELAY);
+    setITGReady(_ITGReady);
+    HAL_Delay(GYROSTART_UP_DELAY);
+    while(!isITGReadyOn()) {
+    }
 }
 
 
@@ -144,7 +153,7 @@ ITG3200::isINTActiveOnLow() {
 
 
 void
-ITG3200::setINTLogiclvl(bool _State) {
+ITG3200::setINTLogiclvl(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_ACTL) | (_State << 7)));
 }
@@ -158,7 +167,7 @@ ITG3200::isINTOpenDrain() {
 
 
 void
-ITG3200::setINTDriveType(bool _State) {
+ITG3200::setINTDriveType(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_OPEN) | _State << 6));
 }
@@ -172,7 +181,7 @@ ITG3200::isLatchUntilCleared() {
 
 
 void
-ITG3200::setLatchMode(bool _State) {
+ITG3200::setLatchMode(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_LATCH_INT_EN) | _State << 5));
 }
@@ -186,7 +195,7 @@ ITG3200::isAnyRegClrMode() {
 
 
 void
-ITG3200::setLatchClearMode(bool _State) {
+ITG3200::setLatchClearMode(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_INT_ANYRD_2CLEAR) | _State << 4));
 }
@@ -200,7 +209,7 @@ ITG3200::isITGReadyOn() {
 
 
 void
-ITG3200::setITGReady(bool _State) {
+ITG3200::setITGReady(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_ITG_RDY_EN) | _State << 2));
 }
@@ -214,7 +223,7 @@ ITG3200::isRawDataReadyOn() {
 
 
 void
-ITG3200::setRawDataReady(bool _State) {
+ITG3200::setRawDataReady(uint8_t _State) {
     readmem(INT_CFG, 1, &buff[0]);
     writemem(INT_CFG, ((buff[0] & ~INTCFG_RAW_RDY_EN) | _State));
 }
@@ -229,6 +238,7 @@ ITG3200::isITGReady() {
 
 bool
 ITG3200::isRawDataReady() {
+    isRawDataReadyOn();
     readmem(INT_STATUS, 1, &buff[0]);
     return (buff[0] & INTSTATUS_RAW_DATA_RDY);
 }
@@ -238,21 +248,6 @@ void
 ITG3200::readTemp(float *_Temp) {
     readmem(TEMP_OUT, 2, buff);
     *_Temp = (buff[0] << 8) | buff[1];
-}
-
-
-void
-ITG3200::readGyroRaw(int16_t *_GyroX, int16_t *_GyroY, int16_t *_GyroZ){
-    readmem(GYRO_XOUT, 6, buff);
-    *_GyroX = ((buff[0] << 8) | buff[1]);
-    *_GyroY = ((buff[2] << 8) | buff[3]);
-    *_GyroZ = ((buff[4] << 8) | buff[5]);
-}
-
-
-void
-ITG3200::readGyroRaw(int16_t *_GyroXYZ){
-    readGyroRaw(_GyroXYZ, _GyroXYZ+1, _GyroXYZ+2);
 }
 
 
@@ -281,20 +276,36 @@ ITG3200::setOffsets(int16_t _Xoffset, int16_t _Yoffset, int16_t _Zoffset) {
 
 
 void
-ITG3200::zeroCalibrate(uint16_t totSamples, uint16_t sampleDelayMS) {
+ITG3200::zeroCalibrate(uint16_t totSamples) {
     int16_t xyz[3];
     float tmpOffsets[] = {0, 0, 0};
-
-    for(uint16_t i=0; i<totSamples; i++) {
-        HAL_Delay(sampleDelayMS);
-        readGyroRaw(xyz);
-        tmpOffsets[0] += xyz[0];
-        tmpOffsets[1] += xyz[1];
-        tmpOffsets[2] += xyz[2];
+    while(!isITGReadyOn()) {
     }
-    setOffsets(-int16_t(tmpOffsets[0]/totSamples),
-               -int16_t(tmpOffsets[1]/totSamples),
-               -int16_t(tmpOffsets[2]/totSamples));
+    for(uint16_t i=0; i<totSamples; i++) {
+        while(!isRawDataReady()) {}
+        readGyroRaw(xyz);
+        tmpOffsets[0] += float(xyz[0]);
+        tmpOffsets[1] += float(xyz[1]);
+        tmpOffsets[2] += float(xyz[2]);
+    }
+    setOffsets(-int16_t(tmpOffsets[0]/float(totSamples)+0.5),
+               -int16_t(tmpOffsets[1]/float(totSamples)+0.5),
+               -int16_t(tmpOffsets[2]/float(totSamples)+0.5));
+}
+
+
+void
+ITG3200::readGyroRaw(int16_t *_GyroX, int16_t *_GyroY, int16_t *_GyroZ){
+    readmem(GYRO_XOUT, 6, buff);
+    *_GyroX = int16_t((uint16_t(buff[0]) << 8) | buff[1]);
+    *_GyroY = int16_t((uint16_t(buff[2]) << 8) | buff[3]);
+    *_GyroZ = int16_t((uint16_t(buff[4]) << 8) | buff[5]);
+}
+
+
+void
+ITG3200::readGyroRaw(int16_t *_GyroXYZ){
+    readGyroRaw(_GyroXYZ, _GyroXYZ+1, _GyroXYZ+2);
 }
 
 
@@ -319,9 +330,9 @@ ITG3200::readGyro(float *_GyroX, float *_GyroY, float *_GyroZ){
      // x,y,z will contain calibrated integer values from the sensor
     readGyroRawCal(&x, &y, &z);
     // sensitivity is 14.375 LSBs per °/sec
-    *_GyroX =  x / 14.375 * polarities[0] * gains[0];
-    *_GyroY =  y / 14.375 * polarities[1] * gains[1];
-    *_GyroZ =  z / 14.375 * polarities[2] * gains[2];
+    *_GyroX =  (float(x) / 14.375) * polarities[0] * gains[0];
+    *_GyroY =  (float(y) / 14.375) * polarities[1] * gains[1];
+    *_GyroZ =  (float(z) / 14.375) * polarities[2] * gains[2];
 }
 
 
@@ -334,7 +345,7 @@ ITG3200::readGyro(float *_GyroXYZ){
 void
 ITG3200::reset() {
     writemem(PWR_MGM, PWRMGM_HRESET);
-    HAL_Delay(GYROSTART_UP_DELAY); //gyro startup
+    HAL_Delay(4*GYROSTART_UP_DELAY); //gyro startup
 }
 
 
@@ -346,7 +357,7 @@ ITG3200::isLowPower() {
 
 
 void
-ITG3200::setPowerMode(bool _State) {
+ITG3200::setPowerMode(uint8_t _State) {
     readmem(PWR_MGM, 1, &buff[0]);
     writemem(PWR_MGM, ((buff[0] & ~PWRMGM_SLEEP) | _State << 6));
 }
@@ -374,21 +385,21 @@ ITG3200::isZgyroStandby() {
 
 
 void
-ITG3200::setXgyroStandby(bool _Status) {
+ITG3200::setXgyroStandby(uint8_t _Status) {
     readmem(PWR_MGM, 1, &buff[0]);
     writemem(PWR_MGM, ((buff[0] & PWRMGM_STBY_XG) | _Status << 5));
 }
 
 
 void
-ITG3200::setYgyroStandby(bool _Status) {
+ITG3200::setYgyroStandby(uint8_t _Status) {
     readmem(PWR_MGM, 1, &buff[0]);
     writemem(PWR_MGM, ((buff[0] & PWRMGM_STBY_YG) | _Status << 4));
 }
 
 
 void
-ITG3200::setZgyroStandby(bool _Status) {
+ITG3200::setZgyroStandby(uint8_t _Status) {
     readmem(PWR_MGM, 1, &buff[0]);
     writemem(PWR_MGM, ((buff[0] & PWRMGM_STBY_ZG) | _Status << 3));
 }

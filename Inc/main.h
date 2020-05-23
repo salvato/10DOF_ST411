@@ -21,9 +21,6 @@ extern "C" {
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void TIM2_IRQHandler(void);
 
-//void USARTx_DMA_RX_IRQHandler(void);
-//void USARTx_DMA_TX_IRQHandler(void);
-//void USARTx_IRQHandler(void);
 void DMA1_Stream5_IRQHandler(void);
 void DMA1_Stream6_IRQHandler(void);
 void USART2_IRQHandler(void);

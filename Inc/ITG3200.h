@@ -84,7 +84,7 @@
 // Gyro Full Scale Range
 #define RANGE2000           3   // default
 // Digital Low Pass Filter BandWidth and SampleRate
-#define BW256_SR8           0   // default    256Khz BW and 8Khz SR
+#define BW256_SR8           0   // default    256Hz BW and 8Khz SR
 #define BW188_SR1           1
 #define BW098_SR1           2
 #define BW042_SR1           3
@@ -139,21 +139,21 @@ public:
     void setFilterBW(byte _BW); // see register parameters above
     // Interrupt Configuration
     bool isINTActiveOnLow();
-    void setINTLogiclvl(bool _State); //ACTIVE_ONHIGH, ACTIVE_ONLOW
+    void setINTLogiclvl(uint8_t _State); //ACTIVE_ONHIGH, ACTIVE_ONLOW
     // Interrupt drive type
     bool isINTOpenDrain();
-    void setINTDriveType(bool _State); //OPEN_DRAIN, PUSH_PULL
+    void setINTDriveType(uint8_t _State); //OPEN_DRAIN, PUSH_PULL
     // Interrupt Latch mode
     bool isLatchUntilCleared();
-    void setLatchMode(bool _State); //UNTIL_INT_CLEARED, PULSE_50US
+    void setLatchMode(uint8_t _State); //UNTIL_INT_CLEARED, PULSE_50US
     // Interrupt Latch clear method
     bool isAnyRegClrMode();
-    void setLatchClearMode(bool _State); //READ_ANYREG, READ_STATUSREG
+    void setLatchClearMode(uint8_t _State); //READ_ANYREG, READ_STATUSREG
     // INT pin triggers
     bool isITGReadyOn();
-    void setITGReady(bool _State);
+    void setITGReady(uint8_t _State);
     bool isRawDataReadyOn();
-    void setRawDataReady(bool _State);
+    void setRawDataReady(uint8_t _State);
     // Trigger Status
     bool isITGReady();
     bool isRawDataReady();
@@ -164,7 +164,7 @@ public:
     void setRevPolarity(bool _Xpol, bool _Ypol, bool _Zpol);	// true = Reversed  false = default
     void setGains(float _Xgain, float _Ygain, float _Zgain);
     void setOffsets(int16_t _Xoffset, int16_t _Yoffset, int16_t _Zoffset);
-    void zeroCalibrate(uint16_t totSamples, uint16_t sampleDelayMS);	// assuming gyroscope is stationary (updates XYZ offsets for zero)
+    void zeroCalibrate(uint16_t totSamples);	// assuming gyroscope is stationary (updates XYZ offsets for zero)
     void readGyroRawCal(int16_t *_GyroX, int16_t *_GyroY, int16_t *_GyroZ);
     void readGyroRawCal(int16_t *_GyroXYZ);
     void readGyro(float *_GyroXYZ); // includes gain and offset
@@ -172,13 +172,13 @@ public:
     // Power management
     void reset(); // after reset all registers have default values
     bool isLowPower();
-    void setPowerMode(bool _State); // NORMAL, STANDBY
+    void setPowerMode(uint8_t _State); // NORMAL, STANDBY
     bool isXgyroStandby();
     bool isYgyroStandby();
     bool isZgyroStandby();
-    void setXgyroStandby(bool _Status); // NORMAL, STANDBY
-    void setYgyroStandby(bool _Status);
-    void setZgyroStandby(bool _Status);
+    void setXgyroStandby(uint8_t _Status); // NORMAL, STANDBY
+    void setYgyroStandby(uint8_t _Status);
+    void setZgyroStandby(uint8_t _Status);
     byte getClockSource();
     void setClockSource(byte _CLKsource); // see register parameters above
 
@@ -186,7 +186,7 @@ public:
     void readmem(uint8_t address, uint8_t length, uint8_t buffer[]);
 
 protected:
-    void init(byte _SRateDiv, byte _Range, byte _filterBW, byte _ClockSrc, bool _ITGReady, bool _INTRawDataReady);
+    void init(byte _SRateDiv, byte _Range, byte _filterBW, byte _ClockSrc, uint8_t _ITGReady, uint8_t _INTRawDataReady);
 
 private:
     I2C_HandleTypeDef* pHi2c;
