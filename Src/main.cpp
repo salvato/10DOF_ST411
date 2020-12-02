@@ -1,3 +1,6 @@
+// Per la configurazione di QtCreatore vai a:
+// https://www.youtube.com/watch?v=YgHe3D1t3Fs
+//
 #include "main.h"
 #include "string.h" // for memset()
 #include "stdio.h"
@@ -295,10 +298,9 @@ TIM2_IRQHandler(void) {
     Acc.get_Gxyz(&values[0]);
     Gyro.readGyro(&values[3]);
     Magn.ReadScaledAxis(&values[6]);
-    for(int i=0; i<30; i++)
-        Madgwick.update(values[3], values[4], values[5],
-                        values[0], values[1], values[2],
-                        values[6], values[7], values[8]);
+	Madgwick.update(values[3], values[4], values[5],
+					values[0], values[1], values[2],
+					values[6], values[7], values[8]);
 
 // yaw:   (about Z axis)
 // pitch: (nose up/down, about Y axis)
